@@ -18,7 +18,7 @@ function sendFrame(win, addon, sharedTexture, renderResult) {
       pixelFormat: 'bgra',
       codedSize: { width: renderResult.width, height: renderResult.height },
       handle: {
-        ioSurface: renderResult.ioSurfaceBuffer,
+        ioSurface: renderResult.textureHandle,
       },
     },
     allReferencesReleased: () => {},

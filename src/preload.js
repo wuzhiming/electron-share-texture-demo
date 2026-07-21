@@ -26,7 +26,4 @@ contextBridge.exposeInMainWorld('nativeTexture', {
   sendCanvasRectUpdate: (rect) => {
     ipcRenderer.send('canvas-rect-update', rect);
   },
-  reportCanvasScreenRect: (rect) => {
-    ipcRenderer.send('canvas-screen-rect', rect);
-  },
 });

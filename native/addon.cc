@@ -29,7 +29,7 @@ Napi::Value NapiRender(const Napi::CallbackInfo& info) {
     SharedTextureResult result = PlatformRender();
 
     Napi::Object obj = Napi::Object::New(env);
-    obj.Set("ioSurfaceBuffer",
+    obj.Set("textureHandle",
             Napi::Buffer<uint8_t>::Copy(env,
                 reinterpret_cast<const uint8_t*>(result.handleData),
                 result.handleSize));

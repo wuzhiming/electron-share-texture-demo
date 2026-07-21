@@ -80,15 +80,7 @@ app.whenReady().then(() => {
     }
   });
 
-  // overlay 窗口跟随：窗口移动时用缓存坐标重算屏幕位置
-  const syncOverlay = () => {
-    if (currentMode === 'overlay' && lastCanvasRect) {
-      const screenRect = getCanvasScreenRect(lastCanvasRect);
-      overlayMode.updatePosition(win, addon, screenRect);
-    }
-  };
-
-  // 请求 renderer 上报最新 canvas 坐标（DevTools 等导致布局变化时）
+  // 请求 renderer 上报最新 canvas 坐标（窗口缩放、DevTools 等导致布局变化时）
   const requestFreshRect = () => {
     if (!win.isDestroyed() && (currentMode === 'embed' || currentMode === 'overlay')) {
       win.webContents.send('get-canvas-rect');

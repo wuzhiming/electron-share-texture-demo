@@ -1,38 +1,73 @@
 // ============================================================
-// 透明窗口叠放模式 (Overlay)
+// 透明窗口叠放模式 (Overlay via BrowserWindow)
 //
-// Electron 窗口设为 transparent，DOM 中对应区域背景透明。
-// 一个无边框原生 Metal 窗口放在 Electron 窗口正后方，
-// 透过透明区域显示渲染内容。
+// 用 Electron 的 BrowserWindow 创建一个无边框子窗口，
+// 然后通过 getNativeWindowHandle() 拿到子窗口的句柄，
+// 用挖孔技术（embedView）在子窗口中嵌入 Metal 渲染。
 //
-// 优点: 完全解耦，原生窗口独立管理
-// 缺点: 移动/缩放时需要手动同步位置，可能有 1-2 帧延迟
+// 本质 = BrowserWindow 子窗口 + 挖孔
+//
+// 优点: 窗口管理在 JS 层，子窗口可叠加 web UI
+// 缺点: 独立窗口，缩放时需手动同步位置
 // ============================================================
 
-function start(win, addon, canvasScreenRect) {
-  const handle = win.getNativeWindowHandle();
-  addon.createOverlay(
-    handle,
-    canvasScreenRect.x,
-    canvasScreenRect.y,
-    canvasScreenRect.width,
-    canvasScreenRect.height
-  );
+const { BrowserWindow } = require('electron');
+
+let childWin = null;
+
+function start(parentWin, addon, screenRect) {
+  stop(addon);
+
+  childWin = new BrowserWindow({
+    parent: parentWin,
+    x: Math.round(screenRect.x),
+    y: Math.round(screenRect.y),
+    width: Math.round(screenRect.width),
+    height: Math.round(screenRect.height),
+    frame: false,
+    transparent: false,
+    hasShadow: false,
+    resizable: false,
+    focusable: false,
+    show: false,
+    webPreferences: { nodeIntegration: false },
+  });
+
+  childWin.once('ready-to-show', () => {
+    childWin.showInactive();
+
+    // 用挖孔技术在子窗口中嵌入 Metal 渲染
+    const handle = childWin.getNativeWindowHandle();
+    const bounds = childWin.getContentBounds();
+    addon.embedView(handle, 0, 0, bounds.width, bounds.height);
+  });
+
+  // 加载一个空白页，不需要任何 web 内容
+  childWin.loadURL('about:blank');
 }
 
 function stop(addon) {
-  addon.destroyOverlay();
+  addon.removeEmbed();
+  if (childWin && !childWin.isDestroyed()) {
+    childWin.close();
+  }
+  childWin = null;
 }
 
-function updatePosition(win, addon, canvasScreenRect) {
-  const handle = win.getNativeWindowHandle();
-  addon.updateOverlay(
-    handle,
-    canvasScreenRect.x,
-    canvasScreenRect.y,
-    canvasScreenRect.width,
-    canvasScreenRect.height
-  );
+function updatePosition(parentWin, addon, screenRect) {
+  if (!childWin || childWin.isDestroyed()) return;
+
+  childWin.setBounds({
+    x: Math.round(screenRect.x),
+    y: Math.round(screenRect.y),
+    width: Math.round(screenRect.width),
+    height: Math.round(screenRect.height),
+  });
+
+  // 重新定位挖孔视图（子窗口内部坐标从 0,0 开始）
+  const handle = childWin.getNativeWindowHandle();
+  const bounds = childWin.getContentBounds();
+  addon.updateEmbedFrame(handle, 0, 0, bounds.width, bounds.height);
 }
 
 module.exports = { start, stop, updatePosition };

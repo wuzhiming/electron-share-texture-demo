@@ -63,8 +63,7 @@ app.whenReady().then(() => {
         if (mode === 'embed') {
           embedMode.start(win, addon, rect);
         } else {
-          const screenRect = getCanvasScreenRect(rect);
-          overlayMode.start(win, addon, screenRect);
+          overlayMode.start(win, addon, getCanvasScreenRect(rect));
         }
       });
     }
@@ -75,8 +74,7 @@ app.whenReady().then(() => {
     if (currentMode === 'embed') {
       embedMode.updateRect(win, addon, rect);
     } else if (currentMode === 'overlay') {
-      const screenRect = getCanvasScreenRect(rect);
-      overlayMode.updatePosition(win, addon, screenRect);
+      overlayMode.updatePosition(win, addon, getCanvasScreenRect(rect));
     }
   });
 

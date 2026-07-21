@@ -1,0 +1,17 @@
+{
+  "name": "shared-texture-demo",
+  "version": "1.0.0",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "rebuild": "electron-rebuild",
+    "build": "node-gyp rebuild"
+  },
+  "dependencies": {
+    "node-addon-api": "^8.3.1"
+  },
+  "devDependencies": {
+    "electron": "^43.1.1",
+    "electron-rebuild": "^3.2.9"
+  }
+}

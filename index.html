@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Shared Texture Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #e0e0e0;
+    }
+    #mode-label {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: #aaa;
+    }
+    #toggle-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      background: #252545;
+      border-radius: 6px;
+      padding: 3px;
+    }
+    #toggle-bar button {
+      padding: 6px 16px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #888;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    #toggle-bar button.active {
+      background: #3a3a6a;
+      color: #fff;
+    }
+    #toggle-bar button:hover:not(.active) {
+      color: #bbb;
+    }
+    #canvas-wrap {
+      position: relative;
+      width: 512px;
+      height: 512px;
+    }
+    #canvas {
+      border: 1px solid #333;
+      border-radius: 4px;
+      display: block;
+    }
+    #fps {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+  <div id="toggle-bar">
+    <button id="btn-shared" class="active">sharedTexture</button>
+    <button id="btn-embed">NSView 挖孔</button>
+  </div>
+  <div id="mode-label">Metal &rarr; IOSurface &rarr; sharedTexture &rarr; Canvas</div>
+  <div id="canvas-wrap">
+    <canvas id="canvas" width="512" height="512"></canvas>
+  </div>
+  <div id="fps"></div>
+  <script src="src/renderer.js"></script>
+</body>
+</html>

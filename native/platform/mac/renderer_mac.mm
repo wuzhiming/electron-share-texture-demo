@@ -157,6 +157,7 @@ void PlatformInit(uint32_t width, uint32_t height) {
 
 void PlatformDestroy() {
     PlatformRemoveEmbed();
+    PlatformDestroyOverlay();
     PlatformDestroyPreview();
 
     g_pipelineState = nil;
@@ -166,15 +167,17 @@ void PlatformDestroy() {
     if (g_ioSurface) { CFRelease(g_ioSurface); g_ioSurface = NULL; }
 }
 
-// Declared in embed_mac.mm / preview_mac.mm
+// Declared in embed_mac.mm / preview_mac.mm / overlay_mac.mm
 void MacRenderEmbed();
 void MacRenderPreview();
+void MacRenderOverlay();
 
 SharedTextureResult PlatformRender() {
     @autoreleasepool {
         MacRenderToTexture(g_texture, g_uniforms);
         MacRenderPreview();
         MacRenderEmbed();
+        MacRenderOverlay();
     }
 
     s_handlePtr = (uintptr_t)g_ioSurface;

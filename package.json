@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
-    "rebuild": "electron-rebuild",
-    "build": "node-gyp rebuild"
+    "build": "node-gyp rebuild --target=$(node -e \"console.log(require('./node_modules/electron/package.json').version)\") --arch=arm64 --dist-url=https://electronjs.org/headers",
+    "start": "ELECTRON_RUN_AS_NODE= electron ."
   },
   "dependencies": {
     "node-addon-api": "^8.3.1"

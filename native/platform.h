@@ -56,3 +56,12 @@ void PlatformUpdateEmbed(void* windowHandle, float x, float y, float w, float h)
 
 void PlatformCreatePreview(uint32_t width, uint32_t height);
 void PlatformDestroyPreview();
+
+// ── 透明窗口叠放 (Overlay) ──
+
+// 创建一个无边框原生窗口，放在 Electron 窗口正后方
+// windowHandle: Electron 窗口句柄（用于层级排序）
+// screenX/Y: Electron 屏幕坐标（Y 向下）
+void PlatformCreateOverlay(void* windowHandle, float screenX, float screenY, float w, float h);
+void PlatformDestroyOverlay();
+void PlatformUpdateOverlay(void* windowHandle, float screenX, float screenY, float w, float h);

@@ -4,10 +4,17 @@ const fpsEl = document.getElementById('fps');
 const modeLabel = document.getElementById('mode-label');
 const btnShared = document.getElementById('btn-shared');
 const btnEmbed = document.getElementById('btn-embed');
+const btnOverlay = document.getElementById('btn-overlay');
 
 let lastTime = performance.now();
 let frameCount = 0;
 let currentMode = 'shared-texture';
+
+const MODE_LABELS = {
+  'shared-texture': 'Metal &rarr; IOSurface &rarr; sharedTexture &rarr; Canvas',
+  'embed':          'Metal &rarr; CAMetalLayer &rarr; NSView 挖孔 (Direct)',
+  'overlay':        'Metal &rarr; 透明窗口叠放 (Overlay)',
+};
 
 // sharedTexture frame receiver
 window.nativeTexture.onFrame((videoFrame) => {
@@ -25,9 +32,9 @@ window.nativeTexture.onFrame((videoFrame) => {
   }
 });
 
-// Mouse events (sharedTexture mode — embed mode handles natively)
+// Mouse events (sharedTexture / overlay mode — embed mode handles natively)
 function sendEvent(type, e) {
-  if (currentMode !== 'shared-texture') return;
+  if (currentMode === 'embed') return;
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left) / rect.width;
   const y = (e.clientY - rect.top) / rect.height;
@@ -39,48 +46,48 @@ canvas.addEventListener('mousedown', (e) => sendEvent('mousedown', e));
 canvas.addEventListener('mouseup', (e) => sendEvent('mouseup', e));
 canvas.addEventListener('mouseleave', (e) => sendEvent('mouseleave', e));
 
-// Report canvas rect for embed positioning
+// Report canvas rect (embed/overlay positioning) — CSS pixels, no DPR scaling
 function reportCanvasRect() {
   const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
   window.nativeTexture.reportCanvasRect({
-    x: rect.x * dpr,
-    y: rect.y * dpr,
-    width: rect.width * dpr,
-    height: rect.height * dpr,
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height,
   });
 }
 
-// Listen for rect request from main process
 window.nativeTexture.onGetCanvasRect(() => {
   reportCanvasRect();
 });
 
-// Report on resize
-window.addEventListener('resize', () => {
-  if (currentMode === 'embed') {
+// 监听 canvas 区域布局变化（窗口缩放、DevTools 打开/关闭等）
+const canvasWrap = document.getElementById('canvas-wrap');
+new ResizeObserver(() => {
+  if (currentMode === 'embed' || currentMode === 'overlay') {
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
     window.nativeTexture.sendCanvasRectUpdate({
-      x: rect.x * dpr,
-      y: rect.y * dpr,
-      width: rect.width * dpr,
-      height: rect.height * dpr,
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
     });
   }
-});
+}).observe(canvasWrap);
 
 // Mode toggle
 function setMode(mode) {
   currentMode = mode;
   btnShared.classList.toggle('active', mode === 'shared-texture');
   btnEmbed.classList.toggle('active', mode === 'embed');
+  btnOverlay.classList.toggle('active', mode === 'overlay');
+
+  modeLabel.innerHTML = MODE_LABELS[mode];
 
   if (mode === 'shared-texture') {
-    modeLabel.innerHTML = 'Metal &rarr; IOSurface &rarr; sharedTexture &rarr; Canvas';
     canvas.style.visibility = 'visible';
   } else {
-    modeLabel.innerHTML = 'Metal &rarr; CAMetalLayer &rarr; NSView 挖孔 (Direct)';
+    // embed 和 overlay 都隐藏 canvas（原生视图覆盖在上面或嵌入在里面）
     canvas.style.visibility = 'hidden';
   }
 
@@ -89,3 +96,4 @@ function setMode(mode) {
 
 btnShared.addEventListener('click', () => setMode('shared-texture'));
 btnEmbed.addEventListener('click', () => setMode('embed'));
+btnOverlay.addEventListener('click', () => setMode('overlay'));

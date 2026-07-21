@@ -13,7 +13,8 @@
           "sources": [
             "native/platform/mac/renderer_mac.mm",
             "native/platform/mac/embed_mac.mm",
-            "native/platform/mac/preview_mac.mm"
+            "native/platform/mac/preview_mac.mm",
+            "native/platform/mac/overlay_mac.mm"
           ],
           "xcode_settings": {
             "CLANG_CXX_LANGUAGE_STANDARD": "c++17",
@@ -33,7 +34,8 @@
           "sources": [
             "native/platform/win/renderer_win.cpp",
             "native/platform/win/embed_win.cpp",
-            "native/platform/win/preview_win.cpp"
+            "native/platform/win/preview_win.cpp",
+            "native/platform/win/overlay_win.cpp"
           ]
         }]
       ]

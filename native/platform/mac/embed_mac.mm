@@ -84,7 +84,8 @@ void PlatformEmbed(void* windowHandle, float x, float y, float w, float h) {
     s_embedLayer = [CAMetalLayer layer];
     s_embedLayer.device = g_device;
     s_embedLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-    s_embedLayer.drawableSize = CGSizeMake(w, h);
+    s_embedLayer.contentsScale = [parent.window backingScaleFactor];
+    s_embedLayer.drawableSize = CGSizeMake(w * s_embedLayer.contentsScale, h * s_embedLayer.contentsScale);
     s_embedLayer.framebufferOnly = YES;
     [s_embedView setLayer:s_embedLayer];
 

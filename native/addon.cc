@@ -86,6 +86,33 @@ Napi::Value NapiUpdateEmbedFrame(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+// ── Overlay (透明窗口叠放) ──
+
+Napi::Value NapiCreateOverlay(const Napi::CallbackInfo& info) {
+    auto buf = info[0].As<Napi::Buffer<uint8_t>>();
+    float x = info[1].As<Napi::Number>().FloatValue();
+    float y = info[2].As<Napi::Number>().FloatValue();
+    float w = info[3].As<Napi::Number>().FloatValue();
+    float h = info[4].As<Napi::Number>().FloatValue();
+    PlatformCreateOverlay(buf.Data(), x, y, w, h);
+    return Napi::Boolean::New(info.Env(), true);
+}
+
+Napi::Value NapiDestroyOverlay(const Napi::CallbackInfo& info) {
+    PlatformDestroyOverlay();
+    return info.Env().Undefined();
+}
+
+Napi::Value NapiUpdateOverlay(const Napi::CallbackInfo& info) {
+    auto buf = info[0].As<Napi::Buffer<uint8_t>>();
+    float x = info[1].As<Napi::Number>().FloatValue();
+    float y = info[2].As<Napi::Number>().FloatValue();
+    float w = info[3].As<Napi::Number>().FloatValue();
+    float h = info[4].As<Napi::Number>().FloatValue();
+    PlatformUpdateOverlay(buf.Data(), x, y, w, h);
+    return info.Env().Undefined();
+}
+
 Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
     exports.Set("init",             Napi::Function::New(env, NapiInit));
     exports.Set("destroy",          Napi::Function::New(env, NapiDestroy));
@@ -94,6 +121,9 @@ Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
     exports.Set("embedView",        Napi::Function::New(env, NapiEmbedView));
     exports.Set("removeEmbed",      Napi::Function::New(env, NapiRemoveEmbed));
     exports.Set("updateEmbedFrame", Napi::Function::New(env, NapiUpdateEmbedFrame));
+    exports.Set("createOverlay",    Napi::Function::New(env, NapiCreateOverlay));
+    exports.Set("destroyOverlay",   Napi::Function::New(env, NapiDestroyOverlay));
+    exports.Set("updateOverlay",    Napi::Function::New(env, NapiUpdateOverlay));
     return exports;
 }
 

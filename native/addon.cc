@@ -1,29 +1,24 @@
 // ============================================================
-// N-API 入口 — 将 native 功能暴露给 JavaScript
+// N-API 入口 — 纯 C++，只依赖 platform.h
+//
+// 不包含任何平台头文件（无 ObjC、无 Win32）。
+// 所有平台特定逻辑由 platform/ 目录下的实现处理。
 // ============================================================
 
-#import "renderer_core.h"
+#include "platform.h"
 #include <napi.h>
 
-// ── Init / Destroy ──
-
 Napi::Value NapiInit(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
     uint32_t w = info[0].As<Napi::Number>().Uint32Value();
     uint32_t h = info[1].As<Napi::Number>().Uint32Value();
-    InitMetal(w, h);
-    CreatePreviewWindow(w, h);
-    return Napi::Boolean::New(env, true);
+    PlatformInit(w, h);
+    return Napi::Boolean::New(info.Env(), true);
 }
 
 Napi::Value NapiDestroy(const Napi::CallbackInfo& info) {
-    RemoveEmbed();
-    DestroyPreviewWindow();
-    DestroyMetal();
+    PlatformDestroy();
     return info.Env().Undefined();
 }
-
-// ── Render (called every frame from JS) ──
 
 Napi::Value NapiRender(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
@@ -31,25 +26,19 @@ Napi::Value NapiRender(const Napi::CallbackInfo& info) {
     if (info.Length() > 0)
         g_uniforms.time = info[0].As<Napi::Number>().FloatValue();
 
-    @autoreleasepool {
-        RenderToTexture(g_texture, g_uniforms);  // → IOSurface (for sharedTexture mode)
-        RenderPreview();                          // → preview window (always)
-        RenderEmbed();                            // → embedded view (挖孔 mode, if active)
-    }
+    SharedTextureResult result = PlatformRender();
 
-    // Return IOSurfaceRef pointer as Buffer (used by sharedTexture mode)
-    Napi::Object result = Napi::Object::New(env);
-    uintptr_t ptr = (uintptr_t)g_ioSurface;
-    result.Set("ioSurfaceBuffer", Napi::Buffer<uint8_t>::Copy(env, reinterpret_cast<uint8_t*>(&ptr), sizeof(uintptr_t)));
-    result.Set("width",  Napi::Number::New(env, g_width));
-    result.Set("height", Napi::Number::New(env, g_height));
-    return result;
+    Napi::Object obj = Napi::Object::New(env);
+    obj.Set("ioSurfaceBuffer",
+            Napi::Buffer<uint8_t>::Copy(env,
+                reinterpret_cast<const uint8_t*>(result.handleData),
+                result.handleSize));
+    obj.Set("width",  Napi::Number::New(env, result.width));
+    obj.Set("height", Napi::Number::New(env, result.height));
+    return obj;
 }
 
-// ── Input (sharedTexture mode — 挖孔 mode handles input natively in MetalEmbedView) ──
-
 Napi::Value NapiSendInput(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
     std::string type = info[0].As<Napi::String>().Utf8Value();
     float x = info[1].As<Napi::Number>().FloatValue();
     float y = info[2].As<Napi::Number>().FloatValue();
@@ -69,39 +58,33 @@ Napi::Value NapiSendInput(const Napi::CallbackInfo& info) {
         g_uniforms.mouseY  = -1.0f;
         g_uniforms.pressed = 0.0f;
     }
-    return env.Undefined();
+    return info.Env().Undefined();
 }
-
-// ── Embed view (挖孔 mode) ──
 
 Napi::Value NapiEmbedView(const Napi::CallbackInfo& info) {
     auto buf = info[0].As<Napi::Buffer<uint8_t>>();
-    NSView* parent = *reinterpret_cast<NSView**>(buf.Data());
     float x = info[1].As<Napi::Number>().FloatValue();
     float y = info[2].As<Napi::Number>().FloatValue();
     float w = info[3].As<Napi::Number>().FloatValue();
     float h = info[4].As<Napi::Number>().FloatValue();
-    EmbedInView(parent, x, y, w, h);
+    PlatformEmbed(buf.Data(), x, y, w, h);
     return Napi::Boolean::New(info.Env(), true);
 }
 
 Napi::Value NapiRemoveEmbed(const Napi::CallbackInfo& info) {
-    RemoveEmbed();
+    PlatformRemoveEmbed();
     return info.Env().Undefined();
 }
 
 Napi::Value NapiUpdateEmbedFrame(const Napi::CallbackInfo& info) {
     auto buf = info[0].As<Napi::Buffer<uint8_t>>();
-    NSView* parent = *reinterpret_cast<NSView**>(buf.Data());
     float x = info[1].As<Napi::Number>().FloatValue();
     float y = info[2].As<Napi::Number>().FloatValue();
     float w = info[3].As<Napi::Number>().FloatValue();
     float h = info[4].As<Napi::Number>().FloatValue();
-    UpdateEmbedFrame(parent, x, y, w, h);
+    PlatformUpdateEmbed(buf.Data(), x, y, w, h);
     return info.Env().Undefined();
 }
-
-// ── Module registration ──
 
 Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
     exports.Set("init",             Napi::Function::New(env, NapiInit));

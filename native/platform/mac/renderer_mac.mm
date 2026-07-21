@@ -1,18 +1,27 @@
-#import "renderer_core.h"
-#import <Foundation/Foundation.h>
+// ============================================================
+// macOS 渲染核心: Metal + IOSurface
+// ============================================================
 
-// ── Global state ──
+#import <Metal/Metal.h>
+#import <IOSurface/IOSurface.h>
+#import <Foundation/Foundation.h>
+#include "../../platform.h"
+
+// ── 全局状态 ──
+
+Uniforms g_uniforms = {0, -1, -1, 0, 0, 0, -10, 0};
 
 id<MTLDevice>              g_device        = nil;
 id<MTLCommandQueue>        g_commandQueue  = nil;
 id<MTLRenderPipelineState> g_pipelineState = nil;
 id<MTLTexture>             g_texture       = nil;
 IOSurfaceRef               g_ioSurface     = NULL;
-uint32_t                   g_width         = 0;
-uint32_t                   g_height        = 0;
-Uniforms                   g_uniforms      = {0, -1, -1, 0, 0, 0, -10, 0};
 
-// ── Metal shader source ──
+static uint32_t s_width  = 0;
+static uint32_t s_height = 0;
+static uintptr_t s_handlePtr = 0;
+
+// ── Shader ──
 
 static const char* kShaderSource = R"(
 #include <metal_stdlib>
@@ -53,7 +62,6 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]],
                                 constant Uniforms &u [[buffer(0)]]) {
     float2 uv = in.uv;
 
-    // Background animation
     float r = sin(uv.x * 6.2832 * 2.0 + u.time * 2.0) * 0.5 + 0.5;
     float g = sin(uv.y * 6.2832 * 2.0 + u.time * 2.5 + 2.094) * 0.5 + 0.5;
     float b = sin((uv.x + uv.y) * 6.2832 * 1.5 + u.time * 1.8 + 4.189) * 0.5 + 0.5;
@@ -63,7 +71,6 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]],
 
     float3 color = float3(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0));
 
-    // Cursor ring at mouse position
     if (u.mouseX >= 0.0) {
         float2 mouseUV = float2(u.mouseX, u.mouseY);
         float dist = length(uv - mouseUV);
@@ -75,7 +82,6 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]],
         }
     }
 
-    // Click ripple
     float rippleAge = u.time - u.clickTime;
     if (rippleAge < 1.0 && rippleAge >= 0.0) {
         float2 clickUV = float2(u.clickX, u.clickY);
@@ -90,9 +96,9 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]],
 }
 )";
 
-// ── Core functions ──
+// ── Mac-internal helpers (used by embed_mac.mm and preview_mac.mm) ──
 
-void RenderToTexture(id<MTLTexture> target, const Uniforms& uniforms) {
+void MacRenderToTexture(id<MTLTexture> target, const Uniforms& uniforms) {
     id<MTLCommandBuffer> commandBuffer = [g_commandQueue commandBuffer];
 
     MTLRenderPassDescriptor* passDesc = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -111,54 +117,71 @@ void RenderToTexture(id<MTLTexture> target, const Uniforms& uniforms) {
     [commandBuffer waitUntilCompleted];
 }
 
-void InitMetal(uint32_t width, uint32_t height) {
-    g_width = width;
-    g_height = height;
+// ── Platform interface implementation ──
 
-    // 1. Create IOSurface (shared texture backing store)
+void PlatformInit(uint32_t width, uint32_t height) {
+    s_width  = width;
+    s_height = height;
+
     NSDictionary* properties = @{
-        (id)kIOSurfaceWidth:           @(g_width),
-        (id)kIOSurfaceHeight:          @(g_height),
+        (id)kIOSurfaceWidth:           @(width),
+        (id)kIOSurfaceHeight:          @(height),
         (id)kIOSurfaceBytesPerElement: @4,
-        (id)kIOSurfaceBytesPerRow:     @(g_width * 4),
-        (id)kIOSurfaceAllocSize:       @(g_width * g_height * 4),
+        (id)kIOSurfaceBytesPerRow:     @(width * 4),
+        (id)kIOSurfaceAllocSize:       @(width * height * 4),
         (id)kIOSurfacePixelFormat:     @((uint32_t)'BGRA'),
     };
     g_ioSurface = IOSurfaceCreate((CFDictionaryRef)properties);
 
-    // 2. Create Metal device and command queue
     g_device = MTLCreateSystemDefaultDevice();
     g_commandQueue = [g_device newCommandQueue];
 
-    // 3. Create texture backed by the IOSurface
     MTLTextureDescriptor* texDesc = [MTLTextureDescriptor
         texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
-                                     width:g_width
-                                    height:g_height
-                                 mipmapped:NO];
+                                     width:width height:height mipmapped:NO];
     texDesc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     texDesc.storageMode = MTLStorageModeShared;
     g_texture = [g_device newTextureWithDescriptor:texDesc iosurface:g_ioSurface plane:0];
 
-    // 4. Compile shaders and create pipeline
     NSError* error = nil;
     id<MTLLibrary> library = [g_device newLibraryWithSource:[NSString stringWithUTF8String:kShaderSource]
-                                                    options:nil
-                                                      error:&error];
-    id<MTLFunction> vertexFunc   = [library newFunctionWithName:@"vertexShader"];
-    id<MTLFunction> fragmentFunc = [library newFunctionWithName:@"fragmentShader"];
+                                                    options:nil error:&error];
+    MTLRenderPipelineDescriptor* pd = [[MTLRenderPipelineDescriptor alloc] init];
+    pd.vertexFunction   = [library newFunctionWithName:@"vertexShader"];
+    pd.fragmentFunction = [library newFunctionWithName:@"fragmentShader"];
+    pd.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+    g_pipelineState = [g_device newRenderPipelineStateWithDescriptor:pd error:&error];
 
-    MTLRenderPipelineDescriptor* pipelineDesc = [[MTLRenderPipelineDescriptor alloc] init];
-    pipelineDesc.vertexFunction  = vertexFunc;
-    pipelineDesc.fragmentFunction = fragmentFunc;
-    pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-    g_pipelineState = [g_device newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
+    PlatformCreatePreview(width, height);
 }
 
-void DestroyMetal() {
+void PlatformDestroy() {
+    PlatformRemoveEmbed();
+    PlatformDestroyPreview();
+
     g_pipelineState = nil;
     g_texture = nil;
     g_commandQueue = nil;
     g_device = nil;
     if (g_ioSurface) { CFRelease(g_ioSurface); g_ioSurface = NULL; }
+}
+
+// Declared in embed_mac.mm / preview_mac.mm
+void MacRenderEmbed();
+void MacRenderPreview();
+
+SharedTextureResult PlatformRender() {
+    @autoreleasepool {
+        MacRenderToTexture(g_texture, g_uniforms);
+        MacRenderPreview();
+        MacRenderEmbed();
+    }
+
+    s_handlePtr = (uintptr_t)g_ioSurface;
+    return {
+        .handleData = &s_handlePtr,
+        .handleSize = sizeof(uintptr_t),
+        .width  = s_width,
+        .height = s_height,
+    };
 }

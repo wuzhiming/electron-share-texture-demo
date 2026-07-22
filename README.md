@@ -72,13 +72,37 @@ src/
 └── renderer.js                      # Renderer 进程：canvas 绘制 + UI 切换
 ```
 
-## 运行
+## 环境要求
+
+- macOS (arm64)，Xcode Command Line Tools 已安装
+- Node.js >= 18
+- npm
+
+## 构建与运行
 
 ```bash
+# 1. 安装依赖
 npm install
+
+# 2. 编译 native addon（自动对齐本地 Electron 版本和架构）
 npm run build
+
+# 3. 启动 demo
 npm start
 ```
+
+切换顶部四个 tab 对比不同方案，旁边的 "Native Metal (Direct)" 窗口作为参照。
+
+### 常见问题
+
+**编译失败 `no member named 'MTLCreateSystemDefaultDevice'`**
+确保安装了 Xcode Command Line Tools：`xcode-select --install`
+
+**运行时报 `NODE_MODULE_VERSION` 不匹配**
+native addon 需要针对 Electron 的 Node 版本编译，重新执行 `npm run build`
+
+**窗口没有出现渲染内容**
+检查是否有 `ELECTRON_RUN_AS_NODE=1` 环境变量，如有请清除：`unset ELECTRON_RUN_AS_NODE`
 
 ## 方案对比
 

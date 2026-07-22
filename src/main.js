@@ -3,6 +3,7 @@ const path = require('path');
 const sharedTextureMode = require('./shared-texture-mode');
 const embedMode = require('./embed-mode');
 const overlayMode = require('./overlay-mode');
+const underlayMode = require('./underlay-mode');
 
 let win = null;
 let addon = null;
@@ -16,6 +17,10 @@ app.whenReady().then(() => {
   win = new BrowserWindow({
     width: width + 50,
     height: height + 150,
+    transparent: true,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 12, y: 12 },
+    hasShadow: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
@@ -26,7 +31,7 @@ app.whenReady().then(() => {
   addon = require('../build/Release/native_renderer.node');
   addon.init(width, height);
 
-  // ── Input forwarding (sharedTexture / overlay mode) ──
+  // ── Input forwarding (embed 模式由原生 NSView 处理，其他模式走 IPC) ──
 
   ipcMain.on('input', (e, data) => {
     if (currentMode !== 'embed') {
@@ -35,7 +40,7 @@ app.whenReady().then(() => {
   });
 
   // ── Canvas 屏幕坐标计算 ──
-  // renderer 发过来的是 CSS 像素 (= macOS points)，不做 DPR 缩放
+
   function getCanvasScreenRect(cssRect) {
     const contentBounds = win.getContentBounds();
     return {
@@ -50,37 +55,50 @@ app.whenReady().then(() => {
 
   let lastCanvasRect = null;
 
-  ipcMain.on('set-mode', (e, mode) => {
+  function stopCurrentMode() {
     if (currentMode === 'embed') embedMode.stop(addon);
     if (currentMode === 'overlay') overlayMode.stop(addon);
+    if (currentMode === 'underlay') underlayMode.stop(addon);
+  }
 
+  function startMode(mode, rect) {
+    lastCanvasRect = rect;
+    const screenRect = getCanvasScreenRect(rect);
+    if (mode === 'embed') {
+      embedMode.start(win, addon, rect);
+    } else if (mode === 'overlay') {
+      overlayMode.start(win, addon, screenRect);
+    } else if (mode === 'underlay') {
+      underlayMode.start(win, addon, screenRect);
+    }
+  }
+
+  ipcMain.on('set-mode', (e, mode) => {
+    stopCurrentMode();
     currentMode = mode;
 
-    if (mode === 'embed' || mode === 'overlay') {
+    if (mode === 'embed' || mode === 'overlay' || mode === 'underlay') {
       e.sender.send('get-canvas-rect');
       ipcMain.once('canvas-rect', (e2, rect) => {
-        lastCanvasRect = rect;
-        if (mode === 'embed') {
-          embedMode.start(win, addon, rect);
-        } else {
-          overlayMode.start(win, addon, getCanvasScreenRect(rect));
-        }
+        startMode(mode, rect);
       });
     }
   });
 
   ipcMain.on('canvas-rect-update', (e, rect) => {
     lastCanvasRect = rect;
+    const screenRect = getCanvasScreenRect(rect);
     if (currentMode === 'embed') {
       embedMode.updateRect(win, addon, rect);
     } else if (currentMode === 'overlay') {
-      overlayMode.updatePosition(win, addon, getCanvasScreenRect(rect));
+      overlayMode.updatePosition(win, addon, screenRect);
+    } else if (currentMode === 'underlay') {
+      underlayMode.updatePosition(win, addon, screenRect);
     }
   });
 
-  // 请求 renderer 上报最新 canvas 坐标（窗口缩放、DevTools 等导致布局变化时）
   const requestFreshRect = () => {
-    if (!win.isDestroyed() && (currentMode === 'embed' || currentMode === 'overlay')) {
+    if (!win.isDestroyed() && currentMode !== 'shared-texture') {
       win.webContents.send('get-canvas-rect');
     }
   };
@@ -107,6 +125,15 @@ app.whenReady().then(() => {
     setTimeout(renderLoop, 200);
   });
 
+  // underlay 的子窗口没有 parent 绑定，需要手动跟随移动
+  const syncUnderlay = () => {
+    if (currentMode === 'underlay' && lastCanvasRect) {
+      const screenRect = getCanvasScreenRect(lastCanvasRect);
+      underlayMode.updatePosition(win, addon, screenRect);
+    }
+  };
+
+  win.on('move', syncUnderlay);
   win.on('resize', requestFreshRect);
   win.webContents.on('devtools-opened', requestFreshRect);
   win.webContents.on('devtools-closed', requestFreshRect);

@@ -15,27 +15,51 @@
       color: #e0e0e0;
       padding-top: 16px;
     }
+    /* underlay 模式: body 透明，canvas 用巨型 box-shadow 让周围不透明 */
+    body.underlay-mode {
+      background: transparent;
+    }
+    body.underlay-mode #canvas {
+      border-color: transparent;
+      box-shadow: 0 0 0 9999px #1a1a2e;
+    }
+    #drag-region {
+      -webkit-app-region: drag;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 38px;
+    }
+    #top-bar {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #1a1a2e;
+      padding: 0 20px 8px;
+      border-radius: 0 0 8px 8px;
+      z-index: 1;
+    }
     #mode-label {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       color: #aaa;
     }
     #toggle-bar {
+      -webkit-app-region: no-drag;
       display: flex;
-      gap: 4px;
-      margin-bottom: 12px;
+      gap: 3px;
+      margin-bottom: 8px;
       background: #252545;
       border-radius: 6px;
       padding: 3px;
     }
     #toggle-bar button {
-      padding: 6px 14px;
+      padding: 5px 12px;
       border: none;
       border-radius: 4px;
       background: transparent;
       color: #888;
-      font-size: 13px;
+      font-size: 12px;
       cursor: pointer;
       transition: all 0.15s;
     }
@@ -58,25 +82,35 @@
       border-radius: 4px;
       display: block;
     }
-    #fps {
+    body.underlay-mode #canvas {
+      border-color: transparent;
+    }
+    #bottom-bar {
       padding: 8px;
       font-size: 12px;
       color: #666;
       font-variant-numeric: tabular-nums;
+      background: #1a1a2e;
+      border-radius: 8px 8px 0 0;
+      z-index: 1;
     }
   </style>
 </head>
 <body>
-  <div id="toggle-bar">
-    <button id="btn-shared" class="active">sharedTexture</button>
-    <button id="btn-embed">NSView 挖孔</button>
-    <button id="btn-overlay">透明窗口</button>
+  <div id="drag-region"></div>
+  <div id="top-bar">
+    <div id="toggle-bar">
+      <button id="btn-shared" class="active">sharedTexture</button>
+      <button id="btn-embed">NSView 挖孔</button>
+      <button id="btn-overlay">窗口覆盖</button>
+      <button id="btn-underlay">透明穿透</button>
+    </div>
+    <div id="mode-label">Metal &rarr; IOSurface &rarr; sharedTexture &rarr; Canvas</div>
   </div>
-  <div id="mode-label">Metal &rarr; IOSurface &rarr; sharedTexture &rarr; Canvas</div>
   <div id="canvas-wrap">
     <canvas id="canvas" width="512" height="512"></canvas>
   </div>
-  <div id="fps"></div>
+  <div id="bottom-bar"><span id="fps"></span></div>
   <script src="src/renderer.js"></script>
 </body>
 </html>

@@ -74,7 +74,7 @@ static NSRect ConvertRect(NSView* parent, float x, float y, float w, float h) {
 
 // ── Platform 接口实现 ──
 
-void PlatformEmbed(void* windowHandle, float x, float y, float w, float h) {
+void PlatformEmbed(void* windowHandle, float x, float y, float w, float h, const EmbedContentOrigin*) {
     PlatformRemoveEmbed();
     NSView* parent = *reinterpret_cast<NSView**>(windowHandle);
 
@@ -100,7 +100,7 @@ void PlatformRemoveEmbed() {
     }
 }
 
-void PlatformUpdateEmbed(void* windowHandle, float x, float y, float w, float h) {
+void PlatformUpdateEmbed(void* windowHandle, float x, float y, float w, float h, const EmbedContentOrigin*) {
     if (!s_embedView) return;
     NSView* parent = *reinterpret_cast<NSView**>(windowHandle);
     [s_embedView setFrame:ConvertRect(parent, x, y, w, h)];

@@ -1,44 +1,45 @@
 // ============================================================
 // sharedTexture 模式
 //
-// Metal 渲染到 IOSurface → Electron importSharedTexture
+// Metal / D3D11 → IOSurface / NT HANDLE → Electron importSharedTexture
 // → sendSharedTexture 到 renderer → getVideoFrame → canvas.drawImage
 //
 // 优点: 零拷贝 GPU 传输，内容在 DOM canvas 中，支持 CSS 布局
 // 要求: Electron >= 38
 // ============================================================
 
-let sending = false;
+let pending = Promise.resolve();
 
 function sendFrame(win, addon, sharedTexture, renderResult) {
-  if (sending) return;
+  const handle = process.platform === 'win32'
+    ? { ntHandle: renderResult.textureHandle }
+    : { ioSurface: renderResult.textureHandle };
+  let resolveReleased;
+  const released = new Promise((resolve) => { resolveReleased = resolve; });
 
   const imported = sharedTexture.importSharedTexture({
     textureInfo: {
       pixelFormat: 'bgra',
       codedSize: { width: renderResult.width, height: renderResult.height },
-      handle: {
-        ioSurface: renderResult.textureHandle,
-      },
+      handle,
     },
-    allReferencesReleased: () => {},
+    allReferencesReleased: resolveReleased,
   });
 
-  sending = true;
-  sharedTexture
-    .sendSharedTexture({
-      frame: win.webContents.mainFrame,
-      importedSharedTexture: imported,
-    })
-    .then(() => {
+  pending = (async () => {
+    try {
+      await sharedTexture.sendSharedTexture({
+        frame: win.webContents.mainFrame,
+        importedSharedTexture: imported,
+      });
+    } finally {
       imported.release();
-      sending = false;
-    })
-    .catch((err) => {
-      console.error('sendSharedTexture failed:', err);
-      imported.release();
-      sending = false;
-    });
+      // Transfer completion alone does not mean the renderer's GPU is done.
+      // The render loop must await this before writing the same native texture.
+      await released;
+    }
+  })();
+  return pending;
 }
 
-module.exports = { sendFrame };
+module.exports = { sendFrame, whenIdle: () => pending.catch(() => {}) };

@@ -2,13 +2,19 @@ const { sharedTexture } = require('electron');
 const { contextBridge, ipcRenderer } = require('electron/renderer');
 
 contextBridge.exposeInMainWorld('nativeTexture', {
+  platform: process.platform,
+  beginWindowDrag: () => ipcRenderer.send('begin-window-drag'),
   onFrame: (callback) => {
     sharedTexture.setSharedTextureReceiver(async (data) => {
       const { importedSharedTexture: imported } = data;
-      const videoFrame = imported.getVideoFrame();
-      callback(videoFrame);
-      videoFrame.close();
-      imported.release();
+      let videoFrame;
+      try {
+        videoFrame = imported.getVideoFrame();
+        callback(videoFrame);
+      } finally {
+        videoFrame?.close();
+        imported.release();
+      }
     });
   },
   sendInput: (type, x, y, button) => {
@@ -25,5 +31,8 @@ contextBridge.exposeInMainWorld('nativeTexture', {
   },
   sendCanvasRectUpdate: (rect) => {
     ipcRenderer.send('canvas-rect-update', rect);
+  },
+  onError: (callback) => {
+    ipcRenderer.on('render-error', (_event, message) => callback(message));
   },
 });

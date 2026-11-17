@@ -9,7 +9,7 @@
 // 具体实现在 platform/mac/ 或 platform/win/ 中。
 //
 // macOS: Metal + IOSurface + NSView
-// Windows: D3D11 + DXGI shared texture + HWND (TODO)
+// Windows: D3D11 + DXGI shared texture + HWND
 // ============================================================
 
 // Uniform buffer — 传给 fragment shader 的状态
@@ -48,9 +48,21 @@ SharedTextureResult PlatformRender();
 
 // windowHandle: getNativeWindowHandle() 返回的 Buffer.data()
 // macOS 内部解释为 NSView**, Windows 内部解释为 HWND*
-void PlatformEmbed(void* windowHandle, float x, float y, float w, float h);
+struct EmbedContentOrigin {
+    int32_t x;  // Physical screen pixels (Windows only).
+    int32_t y;
+};
+void PlatformEmbed(void* windowHandle, float x, float y, float w, float h, const EmbedContentOrigin* origin = nullptr);
 void PlatformRemoveEmbed();
-void PlatformUpdateEmbed(void* windowHandle, float x, float y, float w, float h);
+void PlatformUpdateEmbed(void* windowHandle, float x, float y, float w, float h, const EmbedContentOrigin* origin = nullptr);
+#ifdef _WIN32
+void PlatformBeginWindowDrag(void* windowHandle);
+struct WindowDragRegion {
+    int32_t x, y, width, height; // HWND client coordinates, physical pixels.
+};
+WindowDragRegion PlatformConfigureMenuBarDrag(void* windowHandle);
+void PlatformRemoveMenuBarDrag();
+#endif
 
 // ── 预览窗口 ──
 

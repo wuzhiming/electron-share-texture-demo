@@ -11,12 +11,33 @@ let lastTime = performance.now();
 let frameCount = 0;
 let currentMode = 'shared-texture';
 
-const MODE_LABELS = {
+const isWindows = window.nativeTexture.platform === 'win32';
+document.body.classList.toggle('windows', isWindows);
+if (isWindows) {
+  for (const region of [document.getElementById('drag-region'), document.getElementById('top-bar')]) {
+    region.addEventListener('mousedown', (event) => {
+      if (event.button !== 0 || event.target.closest('#toggle-bar')) return;
+      event.preventDefault();
+      window.nativeTexture.beginWindowDrag();
+    });
+  }
+}
+const MODE_LABELS = isWindows ? {
+  'shared-texture': 'D3D11 &rarr; NT HANDLE &rarr; sharedTexture &rarr; Canvas',
+  'embed':          'D3D11 &rarr; DXGI SwapChain &rarr; HWND 挖孔 (Direct)',
+  'overlay':        'D3D11 &rarr; BrowserWindow(前) + 挖孔',
+  'underlay':       'D3D11 &rarr; BrowserWindow(后) + 透明穿透',
+} : {
   'shared-texture': 'Metal &rarr; IOSurface &rarr; sharedTexture &rarr; Canvas',
   'embed':          'Metal &rarr; CAMetalLayer &rarr; NSView 挖孔 (Direct)',
   'overlay':        'Metal &rarr; BrowserWindow(前) + 挖孔',
   'underlay':       'Metal &rarr; BrowserWindow(后) + 透明穿透',
 };
+btnEmbed.textContent = isWindows ? 'HWND 挖孔' : 'NSView 挖孔';
+modeLabel.innerHTML = MODE_LABELS[currentMode];
+window.nativeTexture.onError((message) => {
+  fpsEl.textContent = `渲染失败：${message}`;
+});
 
 // sharedTexture frame receiver
 window.nativeTexture.onFrame((videoFrame) => {
@@ -38,8 +59,8 @@ window.nativeTexture.onFrame((videoFrame) => {
 function sendEvent(type, e) {
   if (currentMode === 'embed') return;
   const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
+  const x = (e.clientX - rect.left - canvas.clientLeft) / canvas.clientWidth;
+  const y = (e.clientY - rect.top - canvas.clientTop) / canvas.clientHeight;
   window.nativeTexture.sendInput(type, x, y, e.button);
 }
 
@@ -52,10 +73,10 @@ canvas.addEventListener('mouseleave', (e) => sendEvent('mouseleave', e));
 function reportCanvasRect() {
   const rect = canvas.getBoundingClientRect();
   window.nativeTexture.reportCanvasRect({
-    x: rect.x,
-    y: rect.y,
-    width: rect.width,
-    height: rect.height,
+    x: rect.x + canvas.clientLeft,
+    y: rect.y + canvas.clientTop,
+    width: canvas.clientWidth,
+    height: canvas.clientHeight,
   });
 }
 
@@ -68,10 +89,10 @@ new ResizeObserver(() => {
   if (currentMode !== 'shared-texture') {
     const rect = canvas.getBoundingClientRect();
     window.nativeTexture.sendCanvasRectUpdate({
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: rect.height,
+      x: rect.x + canvas.clientLeft,
+      y: rect.y + canvas.clientTop,
+      width: canvas.clientWidth,
+      height: canvas.clientHeight,
     });
   }
 }).observe(canvasWrap);

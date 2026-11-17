@@ -33,17 +33,20 @@ function start(parentWin, addon, screenRect) {
     webPreferences: { nodeIntegration: false },
   });
 
-  childWin.once('ready-to-show', () => {
+  const window = childWin;
+  window.once('ready-to-show', () => {
+    if (childWin !== window || window.isDestroyed() || parentWin.isDestroyed()) return;
     // showInactive: 显示但不抢焦点，自然排在主窗口后面
-    childWin.showInactive();
+    window.showInactive();
 
     // 用挖孔技术在子窗口中嵌入 Metal 渲染
-    const handle = childWin.getNativeWindowHandle();
-    const bounds = childWin.getContentBounds();
+    const handle = window.getNativeWindowHandle();
+    const bounds = window.getContentBounds();
     addon.embedView(handle, 0, 0, bounds.width, bounds.height);
 
     // 确保主窗口在前面
     parentWin.focus();
+    if (process.platform === 'win32') parentWin.moveAbove(window.getMediaSourceId());
   });
 
   childWin.loadURL('about:blank');
@@ -66,6 +69,7 @@ function updatePosition(parentWin, addon, screenRect) {
     width: Math.round(screenRect.width),
     height: Math.round(screenRect.height),
   });
+  if (process.platform === 'win32') parentWin.moveAbove(childWin.getMediaSourceId());
 
   const handle = childWin.getNativeWindowHandle();
   const bounds = childWin.getContentBounds();

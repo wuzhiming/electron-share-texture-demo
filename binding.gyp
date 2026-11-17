@@ -30,9 +30,17 @@
           }
         }],
         ["OS=='win'", {
+          "msvs_settings": {
+            "VCCLCompilerTool": {
+              "AdditionalOptions": ["/utf-8"],
+              "ExceptionHandling": 1
+            }
+          },
+          "libraries": ["d3d11.lib", "dxgi.lib", "d3dcompiler.lib", "user32.lib", "comctl32.lib", "oleacc.lib", "oleaut32.lib"],
           "sources": [
             "native/platform/win/renderer_win.cpp",
             "native/platform/win/embed_win.cpp",
+            "native/platform/win/window_win.cpp",
             "native/platform/win/preview_win.cpp"
           ]
         }]

@@ -13,7 +13,6 @@
       height: 100vh;
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       color: #e0e0e0;
-      padding-top: 16px;
     }
     /* underlay 模式: body 透明，canvas 用巨型 box-shadow 让周围不透明 */
     body.underlay-mode {
@@ -25,11 +24,19 @@
     }
     #drag-region {
       -webkit-app-region: drag;
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 38px;
+      user-select: none;
+      flex: 0 0 32px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #aaa;
+      background: #1a1a2e;
     }
     #top-bar {
+      -webkit-app-region: drag;
+      user-select: none;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -37,6 +44,9 @@
       padding: 0 20px 8px;
       border-radius: 0 0 8px 8px;
       z-index: 1;
+    }
+    body.windows #drag-region, body.windows #top-bar {
+      -webkit-app-region: no-drag;
     }
     #mode-label {
       font-size: 13px;
@@ -54,6 +64,7 @@
       padding: 3px;
     }
     #toggle-bar button {
+      -webkit-app-region: no-drag;
       padding: 5px 12px;
       border: none;
       border-radius: 4px;
@@ -97,7 +108,7 @@
   </style>
 </head>
 <body>
-  <div id="drag-region"></div>
+  <div id="drag-region" title="拖动此处移动窗口">Shared Texture Demo</div>
   <div id="top-bar">
     <div id="toggle-bar">
       <button id="btn-shared" class="active">sharedTexture</button>

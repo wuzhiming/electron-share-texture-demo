@@ -33,12 +33,14 @@ function start(parentWin, addon, screenRect) {
     webPreferences: { nodeIntegration: false },
   });
 
-  childWin.once('ready-to-show', () => {
-    childWin.showInactive();
+  const window = childWin;
+  window.once('ready-to-show', () => {
+    if (childWin !== window || window.isDestroyed()) return;
+    window.showInactive();
 
     // 用挖孔技术在子窗口中嵌入 Metal 渲染
-    const handle = childWin.getNativeWindowHandle();
-    const bounds = childWin.getContentBounds();
+    const handle = window.getNativeWindowHandle();
+    const bounds = window.getContentBounds();
     addon.embedView(handle, 0, 0, bounds.width, bounds.height);
   });
 
